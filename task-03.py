@@ -1,52 +1,86 @@
-import networkx as nx
+import heapq
 
-# Step 1: Add weights to the edges
-# Define weighted edges (connection, weight)
+# Step 1: Define the weighted graph as an adjacency list
 weighted_connections = [
     ("Station A", "Station B", 4),
     ("Station B", "Station C", 2),
     ("Station C", "Station D", 3),
     ("Station D", "Station E", 6),
-    ("Station A", "Station C", 5),  # Additional connection with a weight
+    ("Station A", "Station C", 5),
 ]
 
-# Create a new weighted graph
-weighted_graph = nx.Graph()
-
-# Add weighted edges to the graph
-weighted_graph.add_weighted_edges_from(weighted_connections)
+# Convert connections into an adjacency list
+graph = {}
+for u, v, w in weighted_connections:
+    if u not in graph:
+        graph[u] = []
+    if v not in graph:
+        graph[v] = []
+    graph[u].append((v, w))
+    graph[v].append((u, w))  # Undirected graph
 
 # Step 2: Implement Dijkstra's algorithm
-# Find the shortest path between all pairs of nodes
-shortest_paths = dict(nx.all_pairs_dijkstra_path(weighted_graph))
-shortest_distances = dict(nx.all_pairs_dijkstra_path_length(weighted_graph))
+def dijkstra(graph, start):
+    # Initialize the distances dictionary and priority queue
+    distances = {node: float('inf') for node in graph}
+    distances[start] = 0
+    priority_queue = [(0, start)]  # (distance, node)
+    predecessors = {node: None for node in graph}  # For path reconstruction
 
-# Print shortest paths and distances
-print("Shortest Paths Between All Vertices:")
-for start_node, paths in shortest_paths.items():
-    for end_node, path in paths.items():
-        print(f"{start_node} to {end_node}: Path = {path}")
+    while priority_queue:
+        current_distance, current_node = heapq.heappop(priority_queue)
 
-print("\nShortest Distances Between All Vertices:")
-for start_node, distances in shortest_distances.items():
-    for end_node, distance in distances.items():
-        print(f"{start_node} to {end_node}: Distance = {distance}")
+        # Skip if this node's distance has already been optimized
+        if current_distance > distances[current_node]:
+            continue
 
-# Step 3: Visualize the weighted graph
-plt.figure(figsize=(10, 8))
-pos = nx.spring_layout(weighted_graph)  # Layout for visualization
-nx.draw(
-    weighted_graph,
-    pos,
-    with_labels=True,
-    node_color="lightblue",
-    node_size=1500,
-    font_size=10,
-    font_weight="bold",
-    edge_color="gray",
-)
-# Draw edge labels (weights)
-edge_labels = nx.get_edge_attributes(weighted_graph, "weight")
-nx.draw_networkx_edge_labels(weighted_graph, pos, edge_labels=edge_labels, font_size=10)
-plt.title("Weighted City Subway Network", fontsize=14)
-plt.show()
+        # Explore neighbors
+        for neighbor, weight in graph[current_node]:
+            distance = current_distance + weight
+
+            # Update distance if a shorter path is found
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                predecessors[neighbor] = current_node
+                heapq.heappush(priority_queue, (distance, neighbor))
+
+    return distances, predecessors
+
+# Step 3: Find shortest paths between all pairs of vertices
+def find_all_shortest_paths(graph):
+    all_paths = {}
+    all_distances = {}
+
+    for node in graph:
+        distances, predecessors = dijkstra(graph, node)
+        all_distances[node] = distances
+        all_paths[node] = {}
+
+        # Reconstruct paths from the predecessors
+        for target in graph:
+            if target == node:
+                continue
+
+            path = []
+            current = target
+            while current:
+                path.append(current)
+                current = predecessors[current]
+
+            all_paths[node][target] = path[::-1]  # Reverse the path
+
+    return all_distances, all_paths
+
+# Compute shortest paths
+all_distances, all_paths = find_all_shortest_paths(graph)
+
+# Step 4: Display results
+print("Shortest Distances Between All Vertices:")
+for start, distances in all_distances.items():
+    for end, distance in distances.items():
+        print(f"Distance from {start} to {end}: {distance}")
+
+print("\nShortest Paths Between All Vertices:")
+for start, paths in all_paths.items():
+    for end, path in paths.items():
+        print(f"Path from {start} to {end}: {' -> '.join(path)}")
